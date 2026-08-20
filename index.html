@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>emtoolz - Audio Studio</title>
+  <title>emtoolz Audio Studio</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js"></script>
   <style>
     :root {
@@ -54,7 +54,7 @@
 
     h2 { 
       margin: 0; 
-      font-size: 24px; 
+      font-size: 22px; 
       font-weight: 800;
       background: linear-gradient(135deg, #a855f7, #38bdf8, #22c55e);
       -webkit-background-clip: text;
@@ -63,26 +63,65 @@
 
     .top-controls {
       display: flex;
-      gap: 8px;
+      gap: 6px;
     }
 
     .top-btn {
       background: none;
       border: 1px solid var(--border-color);
       color: var(--text-color);
-      padding: 5px 10px;
+      padding: 5px 8px;
       border-radius: 6px;
       cursor: pointer;
-      font-size: 12px;
+      font-size: 11px;
+      font-weight: 600;
     }
+
+    .top-btn:hover { background: rgba(255,255,255,0.05); }
 
     canvas {
       width: 100%;
       height: 80px;
       background: rgba(0, 0, 0, 0.25);
       border-radius: 10px;
-      margin-bottom: 15px;
+      margin-bottom: 12px;
       border: 1px solid var(--border-color);
+    }
+
+    .player-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 15px;
+    }
+
+    .inline-play-btn {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 13px;
+      transition: transform 0.1s, opacity 0.2s;
+      white-space: nowrap;
+    }
+
+    .inline-play-btn:hover:not(:disabled) { transform: translateY(-1px); }
+    .inline-play-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .seek-container {
+      flex: 1;
+    }
+
+    .time-display {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      opacity: 0.8;
+      margin-top: 4px;
+      font-weight: bold;
     }
 
     .custom-file-upload {
@@ -141,6 +180,7 @@
       outline: none;
     }
 
+    #seekBar { accent-color: #38bdf8; cursor: pointer; }
     #speed { accent-color: #22c55e; }
     #speedVal { color: #22c55e; }
 
@@ -167,14 +207,12 @@
       background: var(--card-bg);
       color: var(--text-color);
       border: 1px solid var(--border-color);
-      padding: 10px;
+      padding: 11px;
       border-radius: 8px;
       font-weight: bold;
     }
 
-    .btn-group { display: flex; gap: 10px; flex: 1; }
-
-    button.action-btn {
+    button.export-btn {
       flex: 1;
       padding: 11px;
       border: none;
@@ -182,13 +220,11 @@
       color: white;
       font-weight: bold;
       cursor: pointer;
-      transition: background-color 0.2s, transform 0.1s;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      transition: transform 0.1s, opacity 0.2s;
     }
-
-    #playBtn { background: linear-gradient(135deg, #10b981, #059669); }
-    #downloadBtn { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
     
-    button:hover:not(:disabled) { transform: translateY(-1px); }
+    button.export-btn:hover:not(:disabled) { transform: translateY(-1px); }
     button:disabled { opacity: 0.4; cursor: not-allowed; }
   </style>
 </head>
@@ -204,6 +240,18 @@
   </div>
 
   <canvas id="visualizer"></canvas>
+
+  <!-- Play düyməsi birbaşa mahnı trekinin yanına əlavə olundu -->
+  <div class="player-row">
+    <button id="playBtn" class="inline-play-btn" disabled data-key="play">Play</button>
+    <div class="seek-container">
+      <input type="range" id="seekBar" min="0" max="100" value="0" step="0.1" disabled>
+      <div class="time-display">
+        <span id="currentTime">00:00</span>
+        <span id="duration">00:00</span>
+      </div>
+    </div>
+  </div>
   
   <label for="audioFile" class="custom-file-upload" data-key="upload">Choose Audio File</label>
   <input type="file" id="audioFile" accept="audio/*">
@@ -244,13 +292,10 @@
   <div class="export-options">
     <select id="exportFormat">
       <option value="wav">WAV</option>
-      <option value="mp3">MP3</option>
+      <option value="mp3">MP3 (320 kbps)</option>
     </select>
 
-    <div class="btn-group">
-      <button id="playBtn" class="action-btn" disabled data-key="play">Play</button>
-      <button id="downloadBtn" class="action-btn" disabled data-key="download">Export</button>
-    </div>
+    <button id="downloadBtn" class="export-btn" disabled data-key="download">Export</button>
   </div>
 </div>
 
@@ -264,7 +309,7 @@
       eightD: "8D Audio Speed",
       noise: "Noise Filter",
       play: "Play",
-      stop: "Stop",
+      pause: "Pause",
       download: "Export",
       rendering: "Rendering...",
       off: "Off"
@@ -277,7 +322,7 @@
       eightD: "Скорость 8D Audio",
       noise: "Фильтр шума",
       play: "Воспроизвести",
-      stop: "Стоп",
+      pause: "Пауза",
       download: "Экспорт",
       rendering: "Обработка...",
       off: "Выкл"
@@ -288,10 +333,18 @@
   let audioCtx, audioBuffer, sourceNode, analyser, pannerNode;
   let bassNode, noiseNode, reverbNode, reverbGainNode;
   let isPlaying = false, pannerAngle = 0, pannerInterval;
-  let hueShift = 0; // Dynamic color shift variable
+  let hueShift = 0;
+  let originalFileName = "";
+  
+  let startTime = 0;
+  let pausedAt = 0;
+  let animationFrameId;
 
   const canvas = document.getElementById('visualizer');
   const canvasCtx = canvas.getContext('2d');
+  const seekBar = document.getElementById('seekBar');
+  const currentTimeEl = document.getElementById('currentTime');
+  const durationEl = document.getElementById('duration');
 
   document.getElementById('langBtn').addEventListener('click', () => {
     currentLang = currentLang === 'en' ? 'ru' : 'en';
@@ -303,7 +356,11 @@
     document.querySelectorAll('[data-key]').forEach(el => {
       const key = el.getAttribute('data-key');
       if (translations[currentLang][key]) {
-        el.innerText = translations[currentLang][key];
+        if (key === 'play') {
+          el.innerText = isPlaying ? translations[currentLang].pause : translations[currentLang].play;
+        } else {
+          el.innerText = translations[currentLang][key];
+        }
       }
     });
   }
@@ -316,15 +373,29 @@
   document.getElementById('audioFile').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    
+    originalFileName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
     document.getElementById('fileName').innerText = file.name;
     
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const arrayBuffer = await file.arrayBuffer();
     audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
     
+    pausedAt = 0;
+    seekBar.disabled = false;
+    seekBar.value = 0;
+    currentTimeEl.innerText = "00:00";
+    durationEl.innerText = formatTime(audioBuffer.duration);
+
     document.getElementById('playBtn').disabled = false;
     document.getElementById('downloadBtn').disabled = false;
   });
+
+  function formatTime(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  }
 
   function applyPreset(type) {
     const s = document.getElementById('speed'), b = document.getElementById('bass'), r = document.getElementById('reverb');
@@ -400,56 +471,98 @@
     return impulse;
   }
 
-  document.getElementById('playBtn').onclick = () => {
-    if (isPlaying) {
-      if (sourceNode) sourceNode.stop();
-      clearInterval(pannerInterval);
-      isPlaying = false;
-      document.getElementById('playBtn').innerText = translations[currentLang].play;
-    } else {
-      setupNodes(audioCtx);
-      sourceNode = audioCtx.createBufferSource();
-      sourceNode.buffer = audioBuffer;
-      sourceNode.playbackRate.value = document.getElementById('speed').value;
+  function playAudio() {
+    setupNodes(audioCtx);
+    sourceNode = audioCtx.createBufferSource();
+    sourceNode.buffer = audioBuffer;
+    sourceNode.playbackRate.value = document.getElementById('speed').value;
 
-      sourceNode.connect(bassNode);
-      bassNode.connect(noiseNode);
-      
-      let lastNode = noiseNode;
-      if (pannerNode) { lastNode.connect(pannerNode); lastNode = pannerNode; }
-      
-      lastNode.connect(analyser);
-      analyser.connect(audioCtx.destination);
+    sourceNode.connect(bassNode);
+    bassNode.connect(noiseNode);
+    
+    let lastNode = noiseNode;
+    if (pannerNode) { lastNode.connect(pannerNode); lastNode = pannerNode; }
+    
+    lastNode.connect(analyser);
+    analyser.connect(audioCtx.destination);
 
-      lastNode.connect(reverbNode);
-      reverbNode.connect(reverbGainNode);
-      reverbGainNode.connect(audioCtx.destination);
+    lastNode.connect(reverbNode);
+    reverbNode.connect(reverbGainNode);
+    reverbGainNode.connect(audioCtx.destination);
 
-      const eSpeed = parseFloat(document.getElementById('eightD').value);
-      if (eSpeed > 0 && pannerNode) {
-        pannerInterval = setInterval(() => {
-          pannerAngle += 0.02 * eSpeed;
-          pannerNode.pan.value = Math.sin(pannerAngle);
-        }, 50);
-      }
+    const eSpeed = parseFloat(document.getElementById('eightD').value);
+    if (eSpeed > 0 && pannerNode) {
+      pannerInterval = setInterval(() => {
+        pannerAngle += 0.02 * eSpeed;
+        pannerNode.pan.value = Math.sin(pannerAngle);
+      }, 50);
+    }
 
-      sourceNode.start(0);
-      isPlaying = true;
-      document.getElementById('playBtn').innerText = translations[currentLang].stop;
-      drawVisualizer();
+    startTime = audioCtx.currentTime - pausedAt / sourceNode.playbackRate.value;
+    sourceNode.start(0, pausedAt);
+    isPlaying = true;
+    document.getElementById('playBtn').innerText = translations[currentLang].pause;
 
-      sourceNode.onended = () => {
+    drawVisualizer();
+
+    sourceNode.onended = () => {
+      if (isPlaying && getCurrentTime() >= audioBuffer.duration - 0.1) {
         isPlaying = false;
+        pausedAt = 0;
+        seekBar.value = 0;
+        currentTimeEl.innerText = "00:00";
         clearInterval(pannerInterval);
         document.getElementById('playBtn').innerText = translations[currentLang].play;
-      };
+      }
+    };
+  }
+
+  function pauseAudio() {
+    if (sourceNode) {
+      pausedAt = getCurrentTime();
+      sourceNode.stop();
+      sourceNode.disconnect();
+    }
+    isPlaying = false;
+    clearInterval(pannerInterval);
+    cancelAnimationFrame(animationFrameId);
+    document.getElementById('playBtn').innerText = translations[currentLang].play;
+  }
+
+  function getCurrentTime() {
+    if (!isPlaying) return pausedAt;
+    const speed = parseFloat(document.getElementById('speed').value) || 1;
+    return (audioCtx.currentTime - startTime) * speed;
+  }
+
+  document.getElementById('playBtn').onclick = () => {
+    if (isPlaying) {
+      pauseAudio();
+    } else {
+      playAudio();
     }
   };
 
-  // Avtomatik Rəng Dəyişən Visualizer Funksiyası
+  seekBar.oninput = (e) => {
+    const seekTo = (e.target.value / 100) * audioBuffer.duration;
+    pausedAt = seekTo;
+    currentTimeEl.innerText = formatTime(pausedAt);
+
+    if (isPlaying) {
+      sourceNode.stop();
+      playAudio();
+    }
+  };
+
   function drawVisualizer() {
     if (!isPlaying) return;
-    requestAnimationFrame(drawVisualizer);
+    animationFrameId = requestAnimationFrame(drawVisualizer);
+
+    const cur = getCurrentTime();
+    if (cur <= audioBuffer.duration) {
+      seekBar.value = (cur / audioBuffer.duration) * 100;
+      currentTimeEl.innerText = formatTime(cur);
+    }
 
     const bufferLength = analyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
@@ -460,13 +573,10 @@
     const barWidth = (canvas.width / bufferLength) * 2;
     let x = 0;
 
-    // Rəngin hər kadrda rəvan dəyişməsi üçün hue dəyərini artırırıq
     hueShift = (hueShift + 1) % 360;
 
     for (let i = 0; i < bufferLength; i++) {
       const barHeight = (dataArray[i] / 255) * canvas.height;
-
-      // HSL istifadə edərək həm vaxta, həm də sütunun indeksinə görə rəng keçidi yaradırıq
       const hue = (hueShift + (i * 12)) % 360;
       
       const gradient = canvasCtx.createLinearGradient(0, canvas.height, 0, 0);
@@ -487,70 +597,84 @@
     const downloadBtn = document.getElementById('downloadBtn');
     downloadBtn.disabled = true;
     
-    const pRate = parseFloat(document.getElementById('speed').value);
-    const duration = audioBuffer.duration / pRate + 2.0;
-    const offlineCtx = new OfflineAudioContext(audioBuffer.numberOfChannels, Math.ceil(duration * audioBuffer.sampleRate), audioBuffer.sampleRate);
+    try {
+      const pRate = parseFloat(document.getElementById('speed').value);
+      const duration = audioBuffer.duration / pRate + 2.0;
+      const offlineCtx = new OfflineAudioContext(audioBuffer.numberOfChannels, Math.ceil(duration * audioBuffer.sampleRate), audioBuffer.sampleRate);
 
-    setupNodes(offlineCtx);
-    const offSource = offlineCtx.createBufferSource();
-    offSource.buffer = audioBuffer;
-    offSource.playbackRate.value = pRate;
+      setupNodes(offlineCtx);
+      const offSource = offlineCtx.createBufferSource();
+      offSource.buffer = audioBuffer;
+      offSource.playbackRate.value = pRate;
 
-    offSource.connect(bassNode);
-    bassNode.connect(noiseNode);
-    noiseNode.connect(offlineCtx.destination);
-    noiseNode.connect(reverbNode);
-    reverbNode.connect(reverbGainNode);
-    reverbGainNode.connect(offlineCtx.destination);
+      offSource.connect(bassNode);
+      bassNode.connect(noiseNode);
+      noiseNode.connect(offlineCtx.destination);
+      noiseNode.connect(reverbNode);
+      reverbNode.connect(reverbGainNode);
+      reverbGainNode.connect(offlineCtx.destination);
 
-    offSource.start(0);
-    
-    downloadBtn.innerText = translations[currentLang].rendering;
-    const rendered = await offlineCtx.startRendering();
-    
-    const format = document.getElementById('exportFormat').value;
-    let blob;
+      offSource.start(0);
+      
+      downloadBtn.innerText = translations[currentLang].rendering;
+      const rendered = await offlineCtx.startRendering();
+      
+      const format = document.getElementById('exportFormat').value;
+      let blob;
 
-    if (format === 'wav') {
-      downloadBtn.innerText = "100%";
-      blob = bufferToWave(rendered, rendered.length);
-    } else {
-      blob = await bufferToMp3WithProgress(rendered, (percent) => {
-        downloadBtn.innerText = `${percent}%`;
-      });
-    }
-
-    const defaultName = `emtoolz_audio.${format}`;
-
-    if ('showSaveFilePicker' in window) {
-      try {
-        const handle = await window.showSaveFilePicker({
-          suggestedName: defaultName,
-          types: [{
-            description: 'Audio File',
-            accept: {
-              [format === 'wav' ? 'audio/wav' : 'audio/mp3']: [`.${format}`]
-            }
-          }]
+      if (format === 'wav') {
+        downloadBtn.innerText = "100%";
+        blob = bufferToWave(rendered, rendered.length);
+      } else {
+        blob = await bufferToMp3WithProgress(rendered, (percent) => {
+          downloadBtn.innerText = `${percent}%`;
         });
-        const writable = await handle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-      } catch (err) {
-        if (err.name !== 'AbortError') {
-          console.error(err);
+      }
+
+      const speedVal = document.getElementById('speed').value;
+      let suffix = "";
+      if (speedVal < 1.0) suffix = "_slowed";
+      else if (speedVal > 1.0) suffix = "_nightcore";
+      else suffix = "_edited";
+
+      const suggestedName = `${originalFileName || 'audio'}${suffix}.${format}`;
+
+      if (window.showSaveFilePicker) {
+        try {
+          const handle = await window.showSaveFilePicker({
+            suggestedName: suggestedName,
+            types: [{
+              description: format.toUpperCase() + ' Audio',
+              accept: { [`audio/${format}`]: [`.${format}`] },
+            }],
+          });
+          const writable = await handle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          return;
+        } catch (err) {
+          if (err.name === 'AbortError') return;
         }
       }
-    } else {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = defaultName;
-      a.click();
-    }
 
-    downloadBtn.disabled = false;
-    downloadBtn.innerText = translations[currentLang].download;
+      const reader = new FileReader();
+      reader.onloadend = function() {
+        const a = document.createElement('a');
+        a.href = reader.result;
+        a.download = suggestedName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      };
+      reader.readAsDataURL(blob);
+
+    } catch (err) {
+      console.error(err);
+      alert("Export xətası yarandı, yenidən sınayın.");
+    } finally {
+      downloadBtn.disabled = false;
+      downloadBtn.innerText = translations[currentLang].download;
+    }
   };
 
   function bufferToWave(abuffer, len) {
@@ -572,51 +696,69 @@
   }
 
   function bufferToMp3WithProgress(buffer, onProgress) {
-    return new Promise((resolve) => {
-      const channels = buffer.numberOfChannels;
-      const sampleRate = buffer.sampleRate;
-      const mp3encoder = new lamejs.Mp3Encoder(channels, sampleRate, 128);
-      const mp3Data = [];
+    return new Promise((resolve, reject) => {
+      try {
+        const channels = buffer.numberOfChannels;
+        const sampleRate = buffer.sampleRate;
+        
+        const mp3encoder = new lamejs.Mp3Encoder(channels > 1 ? 2 : 1, sampleRate, 320);
+        const mp3Data = [];
 
-      const left = buffer.getChannelData(0);
-      const right = channels > 1 ? buffer.getChannelData(1) : left;
+        const left = buffer.getChannelData(0);
+        const right = channels > 1 ? buffer.getChannelData(1) : left;
 
-      const sampleBlockSize = 1152;
-      const totalBlocks = Math.ceil(left.length / sampleBlockSize);
-      let currentBlock = 0;
+        const sampleBlockSize = 1152;
+        const length = left.length;
+        let offset = 0;
 
-      function processChunk() {
-        const start = currentBlock * sampleBlockSize;
-        const end = Math.min(start + sampleBlockSize, left.length);
+        function processChunk() {
+          const end = Math.min(offset + sampleBlockSize * 10, length);
+          const chunkLen = end - offset;
 
-        if (start < left.length) {
-          const leftChunk = left.subarray(start, end);
-          const rightChunk = right.subarray(start, end);
+          if (chunkLen > 0) {
+            for (let i = offset; i < end; i += sampleBlockSize) {
+              const subLen = Math.min(sampleBlockSize, end - i);
+              const leftChunk = new Int16Array(subLen);
+              const rightChunk = new Int16Array(subLen);
 
-          const l = new Int16Array(leftChunk.length);
-          const r = new Int16Array(rightChunk.length);
+              for (let j = 0; j < subLen; j++) {
+                let sL = Math.max(-1, Math.min(1, left[i + j]));
+                leftChunk[j] = sL < 0 ? sL * 0x8000 : sL * 0x7FFF;
 
-          for (let j = 0; j < leftChunk.length; j++) {
-            l[j] = leftChunk[j] < 0 ? leftChunk[j] * 32768 : leftChunk[j] * 32767;
-            r[j] = rightChunk[j] < 0 ? rightChunk[j] * 32768 : rightChunk[j] * 32767;
+                let sR = Math.max(-1, Math.min(1, right[i + j]));
+                rightChunk[j] = sR < 0 ? sR * 0x8000 : sR * 0x7FFF;
+              }
+
+              let mp3buf;
+              if (channels > 1) {
+                mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
+              } else {
+                mp3buf = mp3encoder.encodeBuffer(leftChunk);
+              }
+
+              if (mp3buf.length > 0) {
+                mp3Data.push(mp3buf);
+              }
+            }
+
+            offset = end;
+            const percent = Math.floor((offset / length) * 100);
+            onProgress(percent);
+
+            setTimeout(processChunk, 0);
+          } else {
+            const mp3buf = mp3encoder.flush();
+            if (mp3buf.length > 0) {
+              mp3Data.push(mp3buf);
+            }
+            resolve(new Blob(mp3Data, { type: 'audio/mp3' }));
           }
-
-          const mp3buf = mp3encoder.encodeBuffer(l, r);
-          if (mp3buf.length > 0) mp3Data.push(mp3buf);
-
-          currentBlock++;
-          const percent = Math.floor((currentBlock / totalBlocks) * 100);
-          onProgress(percent);
-
-          setTimeout(processChunk, 0);
-        } else {
-          const mp3buf = mp3encoder.flush();
-          if (mp3buf.length > 0) mp3Data.push(mp3buf);
-          resolve(new Blob(mp3Data, { type: 'audio/mp3' }));
         }
-      }
 
-      processChunk();
+        processChunk();
+      } catch (e) {
+        reject(e);
+      }
     });
   }
 </script>
