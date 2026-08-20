@@ -52,7 +52,14 @@
       margin-bottom: 15px;
     }
 
-    h2 { margin: 0; color: var(--accent-color); font-size: 22px; }
+    h2 { 
+      margin: 0; 
+      font-size: 24px; 
+      font-weight: 800;
+      background: linear-gradient(135deg, #a855f7, #38bdf8, #22c55e);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
 
     .top-controls {
       display: flex;
@@ -72,52 +79,88 @@
     canvas {
       width: 100%;
       height: 80px;
-      background: rgba(0, 0, 0, 0.2);
-      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 10px;
       margin-bottom: 15px;
+      border: 1px solid var(--border-color);
     }
 
     .custom-file-upload {
-      background-color: var(--accent-color);
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
       color: white;
-      padding: 10px;
-      border-radius: 8px;
+      padding: 12px;
+      border-radius: 10px;
       cursor: pointer;
       display: block;
       text-align: center;
       font-weight: bold;
       margin-bottom: 15px;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+      transition: transform 0.2s, opacity 0.2s;
     }
+
+    .custom-file-upload:hover { opacity: 0.9; transform: translateY(-1px); }
 
     input[type="file"] { display: none; }
 
     .preset-group {
       display: flex;
-      gap: 5px;
-      margin-bottom: 15px;
+      gap: 8px;
+      margin-bottom: 18px;
     }
 
     .preset-btn {
       flex: 1;
-      padding: 6px;
+      padding: 8px 4px;
       font-size: 11px;
-      border: 1px solid var(--border-color);
-      background: var(--card-bg);
-      color: var(--text-color);
-      border-radius: 6px;
+      font-weight: 700;
+      color: white;
+      border: none;
+      border-radius: 8px;
       cursor: pointer;
+      transition: all 0.2s;
     }
 
-    .control-group { margin: 12px 0; }
+    .preset-btn:hover { transform: scale(1.03); opacity: 0.9; }
+
+    .btn-slowed { background: linear-gradient(135deg, #8b5cf6, #d946ef); }
+    .btn-nightcore { background: linear-gradient(135deg, #06b6d4, #3b82f6); }
+    .btn-bass { background: linear-gradient(135deg, #f43f5e, #fb923c); }
+    .btn-reset { background: linear-gradient(135deg, #475569, #64748b); }
+
+    .control-group { margin: 14px 0; }
     label { display: block; margin-bottom: 4px; font-size: 13px; font-weight: 600; }
-    input[type="range"] { width: 100%; accent-color: var(--accent-color); }
-    .val-display { float: right; color: var(--accent-color); }
+    .val-display { float: right; font-weight: bold; }
+
+    input[type="range"] { 
+      width: 100%; 
+      height: 6px;
+      border-radius: 5px;
+      appearance: none;
+      background: rgba(255,255,255,0.1);
+      outline: none;
+    }
+
+    #speed { accent-color: #22c55e; }
+    #speedVal { color: #22c55e; }
+
+    #bass { accent-color: #f43f5e; }
+    #bassVal { color: #f43f5e; }
+
+    #reverb { accent-color: #a855f7; }
+    #reverbVal { color: #a855f7; }
+
+    #eightD { accent-color: #38bdf8; }
+    #eightDVal { color: #38bdf8; }
+
+    #noise { accent-color: #f97316; }
+    #noiseVal { color: #f97316; }
 
     .export-options {
       display: flex;
       gap: 10px;
       align-items: center;
-      margin-top: 15px;
+      margin-top: 18px;
     }
 
     select {
@@ -133,25 +176,27 @@
 
     button.action-btn {
       flex: 1;
-      padding: 10px;
+      padding: 11px;
       border: none;
       border-radius: 8px;
       color: white;
       font-weight: bold;
       cursor: pointer;
-      transition: background-color 0.2s;
+      transition: background-color 0.2s, transform 0.1s;
     }
 
-    #playBtn { background-color: #10b981; }
-    #downloadBtn { background-color: #8b5cf6; }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    #playBtn { background: linear-gradient(135deg, #10b981, #059669); }
+    #downloadBtn { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+    
+    button:hover:not(:disabled) { transform: translateY(-1px); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
   </style>
 </head>
 <body>
 
 <div class="container">
   <div class="header">
-    <h2>emtoolz Audio</h2>
+    <h2>🎵 emtoolz Audio Studio 🎶</h2>
     <div class="top-controls">
       <button class="top-btn" id="langBtn">RU</button>
       <button class="top-btn" id="themeBtn">☀️/🌙</button>
@@ -165,10 +210,10 @@
   <div id="fileName" style="margin-bottom: 10px; font-size: 12px; opacity: 0.7; text-align: center;"></div>
 
   <div class="preset-group">
-    <button class="preset-btn" onclick="applyPreset('slowed')">Slowed+Reverb</button>
-    <button class="preset-btn" onclick="applyPreset('nightcore')">Nightcore</button>
-    <button class="preset-btn" onclick="applyPreset('bass')">Bass Boost</button>
-    <button class="preset-btn" onclick="applyPreset('reset')">Reset</button>
+    <button class="preset-btn btn-slowed" onclick="applyPreset('slowed')">Slowed+Reverb</button>
+    <button class="preset-btn btn-nightcore" onclick="applyPreset('nightcore')">Nightcore</button>
+    <button class="preset-btn btn-bass" onclick="applyPreset('bass')">Bass Boost</button>
+    <button class="preset-btn btn-reset" onclick="applyPreset('reset')">Reset</button>
   </div>
 
   <div class="control-group">
@@ -243,11 +288,11 @@
   let audioCtx, audioBuffer, sourceNode, analyser, pannerNode;
   let bassNode, noiseNode, reverbNode, reverbGainNode;
   let isPlaying = false, pannerAngle = 0, pannerInterval;
+  let hueShift = 0; // Dynamic color shift variable
 
   const canvas = document.getElementById('visualizer');
   const canvasCtx = canvas.getContext('2d');
 
-  // Multi-language
   document.getElementById('langBtn').addEventListener('click', () => {
     currentLang = currentLang === 'en' ? 'ru' : 'en';
     document.getElementById('langBtn').innerText = currentLang === 'en' ? 'RU' : 'EN';
@@ -263,13 +308,11 @@
     });
   }
 
-  // Theme
   document.getElementById('themeBtn').addEventListener('click', () => {
     const isLight = document.body.getAttribute('data-theme') === 'light';
     document.body.setAttribute('data-theme', isLight ? 'dark' : 'light');
   });
 
-  // Audio File Load
   document.getElementById('audioFile').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -283,7 +326,6 @@
     document.getElementById('downloadBtn').disabled = false;
   });
 
-  // Presets
   function applyPreset(type) {
     const s = document.getElementById('speed'), b = document.getElementById('bass'), r = document.getElementById('reverb');
     if (type === 'slowed') { s.value = 0.85; b.value = 10; r.value = 35; }
@@ -296,7 +338,6 @@
     r.dispatchEvent(new Event('input'));
   }
 
-  // Controls UI & Live Audio Updates
   document.getElementById('speed').oninput = (e) => { 
     document.getElementById('speedVal').innerText = `${e.target.value}x`; 
     if (sourceNode) sourceNode.playbackRate.value = e.target.value; 
@@ -359,7 +400,6 @@
     return impulse;
   }
 
-  // Playback
   document.getElementById('playBtn').onclick = () => {
     if (isPlaying) {
       if (sourceNode) sourceNode.stop();
@@ -406,27 +446,43 @@
     }
   };
 
-  // Visualizer Loop
+  // Avtomatik Rəng Dəyişən Visualizer Funksiyası
   function drawVisualizer() {
     if (!isPlaying) return;
     requestAnimationFrame(drawVisualizer);
+
     const bufferLength = analyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
     analyser.getByteFrequencyData(dataArray);
 
     canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
-    const barWidth = (canvas.width / bufferLength) * 2.5;
+
+    const barWidth = (canvas.width / bufferLength) * 2;
     let x = 0;
 
+    // Rəngin hər kadrda rəvan dəyişməsi üçün hue dəyərini artırırıq
+    hueShift = (hueShift + 1) % 360;
+
     for (let i = 0; i < bufferLength; i++) {
-      const barHeight = dataArray[i] / 4;
-      canvasCtx.fillStyle = `#38bdf8`;
-      canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+      const barHeight = (dataArray[i] / 255) * canvas.height;
+
+      // HSL istifadə edərək həm vaxta, həm də sütunun indeksinə görə rəng keçidi yaradırıq
+      const hue = (hueShift + (i * 12)) % 360;
+      
+      const gradient = canvasCtx.createLinearGradient(0, canvas.height, 0, 0);
+      gradient.addColorStop(0, `hsl(${hue}, 80%, 45%)`);
+      gradient.addColorStop(1, `hsl(${(hue + 40) % 360}, 95%, 65%)`);
+
+      canvasCtx.fillStyle = gradient;
+
+      canvasCtx.beginPath();
+      canvasCtx.roundRect(x, canvas.height - barHeight, barWidth - 2, barHeight, [4, 4, 0, 0]);
+      canvasCtx.fill();
+
       x += barWidth + 1;
     }
   }
 
-  // Dynamic Export Progress Logic
   document.getElementById('downloadBtn').onclick = async () => {
     const downloadBtn = document.getElementById('downloadBtn');
     downloadBtn.disabled = true;
@@ -515,7 +571,6 @@
     return new Blob([buffer], {type: "audio/wav"});
   }
 
-  // Exact MP3 Encoding with Progress Callback
   function bufferToMp3WithProgress(buffer, onProgress) {
     return new Promise((resolve) => {
       const channels = buffer.numberOfChannels;
@@ -553,7 +608,6 @@
           const percent = Math.floor((currentBlock / totalBlocks) * 100);
           onProgress(percent);
 
-          // Yield UI thread to update button text smoothy
           setTimeout(processChunk, 0);
         } else {
           const mp3buf = mp3encoder.flush();
