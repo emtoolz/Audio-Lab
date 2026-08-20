@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>emtoolz - Audio Studio</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js"></script>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --text-color: #f8fafc;
+      --accent-color: #38bdf8;
+      --border-color: #334155;
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --text-color: #0f172a;
+      --accent-color: #0284c7;
+      --border-color: #cbd5e1;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+      transition: all 0.3s ease;
+    }
+
+    .container {
+      background-color: var(--card-bg);
+      padding: 25px;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+      width: 100%;
+      max-width: 500px;
+      border: 1px solid var(--border-color);
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+
+    h2 { margin: 0; color: var(--accent-color); font-size: 22px; }
+
+    .top-controls {
+      display: flex;
+      gap: 8px;
+    }
+
+    .top-btn {
+      background: none;
+      border: 1px solid var(--border-color);
+      color: var(--text-color);
+      padding: 5px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    canvas {
+      width: 100%;
+      height: 80px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+      margin-bottom: 15px;
+    }
+
+    .custom-file-upload {
+      background-color: var(--accent-color);
+      color: white;
+      padding: 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: block;
+      text-align: center;
+      font-weight: bold;
+      margin-bottom: 15px;
+    }
+
+    input[type="file"] { display: none; }
+
+    .preset-group {
+      display: flex;
+      gap: 5px;
+      margin-bottom: 15px;
+    }
+
+    .preset-btn {
+      flex: 1;
+      padding: 6px;
+      font-size: 11px;
+      border: 1px solid var(--border-color);
+      background: var(--card-bg);
+      color: var(--text-color);
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .control-group { margin: 12px 0; }
+    label { display: block; margin-bottom: 4px; font-size: 13px; font-weight: 600; }
+    input[type="range"] { width: 100%; accent-color: var(--accent-color); }
+    .val-display { float: right; color: var(--accent-color); }
+
+    .export-options {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-top: 15px;
+    }
+
+    select {
+      background: var(--card-bg);
+      color: var(--text-color);
+      border: 1px solid var(--border-color);
+      padding: 10px;
+      border-radius: 8px;
+      font-weight: bold;
+    }
+
+    .btn-group { display: flex; gap: 10px; flex: 1; }
+
+    button.action-btn {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    #playBtn { background-color: #10b981; }
+    #downloadBtn { background-color: #8b5cf6; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <h2>emtoolz Audio</h2>
+    <div class="top-controls">
+      <button class="top-btn" id="langBtn">RU</button>
+      <button class="top-btn" id="themeBtn">☀️/🌙</button>
+    </div>
+  </div>
+
+  <canvas id="visualizer"></canvas>
+  
+  <label for="audioFile" class="custom-file-upload" data-key="upload">Choose Audio File</label>
+  <input type="file" id="audioFile" accept="audio/*">
+  <div id="fileName" style="margin-bottom: 10px; font-size: 12px; opacity: 0.7; text-align: center;"></div>
+
+  <div class="preset-group">
+    <button class="preset-btn" onclick="applyPreset('slowed')">Slowed+Reverb</button>
+    <button class="preset-btn" onclick="applyPreset('nightcore')">Nightcore</button>
+    <button class="preset-btn" onclick="applyPreset('bass')">Bass Boost</button>
+    <button class="preset-btn" onclick="applyPreset('reset')">Reset</button>
+  </div>
+
+  <div class="control-group">
+    <label><span data-key="speed">Speed</span>: <span id="speedVal" class="val-display">1.0x</span></label>
+    <input type="range" id="speed" min="0.5" max="1.5" step="0.01" value="1.0">
+  </div>
+
+  <div class="control-group">
+    <label><span data-key="bass">Bass Boost</span>: <span id="bassVal" class="val-display">0 dB</span></label>
+    <input type="range" id="bass" min="0" max="20" step="1" value="0">
+  </div>
+
+  <div class="control-group">
+    <label><span data-key="reverb">Reverb</span>: <span id="reverbVal" class="val-display">0%</span></label>
+    <input type="range" id="reverb" min="0" max="100" step="5" value="0">
+  </div>
+
+  <div class="control-group">
+    <label><span data-key="eightD">8D Audio Speed</span>: <span id="eightDVal" class="val-display">Off</span></label>
+    <input type="range" id="eightD" min="0" max="10" step="1" value="0">
+  </div>
+
+  <div class="control-group">
+    <label><span data-key="noise">Noise Filter</span>: <span id="noiseVal" class="val-display">Off</span></label>
+    <input type="range" id="noise" min="2000" max="20000" step="500" value="20000">
+  </div>
+
+  <div class="export-options">
+    <select id="exportFormat">
+      <option value="wav">WAV</option>
+      <option value="mp3">MP3</option>
+    </select>
+
+    <div class="btn-group">
+      <button id="playBtn" class="action-btn" disabled data-key="play">Play</button>
+      <button id="downloadBtn" class="action-btn" disabled data-key="download">Export</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const translations = {
+    en: {
+      upload: "Choose Audio File",
+      speed: "Speed",
+      bass: "Bass Boost",
+      reverb: "Reverb",
+      eightD: "8D Audio Speed",
+      noise: "Noise Filter",
+      play: "Play",
+      stop: "Stop",
+      download: "Export",
+      off: "Off"
+    },
+    ru: {
+      upload: "Выбрать аудиофайл",
+      speed: "Скорость",
+      bass: "Усиление баса",
+      reverb: "Реверберация",
+      eightD: "Скорость 8D Audio",
+      noise: "Фильтр шума",
+      play: "Воспроизвести",
+      stop: "Стоп",
+      download: "Экспорт",
+      off: "Выкл"
+    }
+  };
+
+  let currentLang = 'en';
+  let audioCtx, audioBuffer, sourceNode, analyser, pannerNode;
+  let bassNode, noiseNode, reverbNode, reverbGainNode;
+  let isPlaying = false, pannerAngle = 0, pannerInterval;
+
+  const canvas = document.getElementById('visualizer');
+  const canvasCtx = canvas.getContext('2d');
+
+  // Multi-language
+  document.getElementById('langBtn').addEventListener('click', () => {
+    currentLang = currentLang === 'en' ? 'ru' : 'en';
+    document.getElementById('langBtn').innerText = currentLang === 'en' ? 'RU' : 'EN';
+    updateLanguage();
+  });
+
+  function updateLanguage() {
+    document.querySelectorAll('[data-key]').forEach(el => {
+      const key = el.getAttribute('data-key');
+      if (translations[currentLang][key]) {
+        el.innerText = translations[currentLang][key];
+      }
+    });
+  }
+
+  // Theme
+  document.getElementById('themeBtn').addEventListener('click', () => {
+    const isLight = document.body.getAttribute('data-theme') === 'light';
+    document.body.setAttribute('data-theme', isLight ? 'dark' : 'light');
+  });
+
+  // Audio File Load
+  document.getElementById('audioFile').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    document.getElementById('fileName').innerText = file.name;
+    
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const arrayBuffer = await file.arrayBuffer();
+    audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+    
+    document.getElementById('playBtn').disabled = false;
+    document.getElementById('downloadBtn').disabled = false;
+  });
+
+  // Presets
+  function applyPreset(type) {
+    const s = document.getElementById('speed'), b = document.getElementById('bass'), r = document.getElementById('reverb');
+    if (type === 'slowed') { s.value = 0.85; b.value = 10; r.value = 35; }
+    else if (type === 'nightcore') { s.value = 1.25; b.value = 3; r.value = 0; }
+    else if (type === 'bass') { s.value = 1.0; b.value = 18; r.value = 0; }
+    else if (type === 'reset') { s.value = 1.0; b.value = 0; r.value = 0; }
+    
+    s.dispatchEvent(new Event('input'));
+    b.dispatchEvent(new Event('input'));
+    r.dispatchEvent(new Event('input'));
+  }
+
+  // Controls UI & Live Audio Updates
+  document.getElementById('speed').oninput = (e) => { 
+    document.getElementById('speedVal').innerText = `${e.target.value}x`; 
+    if (sourceNode) sourceNode.playbackRate.value = e.target.value; 
+  };
+  
+  document.getElementById('bass').oninput = (e) => { 
+    document.getElementById('bassVal').innerText = `${e.target.value} dB`; 
+    if (bassNode) bassNode.gain.value = e.target.value; 
+  };
+  
+  document.getElementById('reverb').oninput = (e) => { 
+    document.getElementById('reverbVal').innerText = `${e.target.value}%`; 
+    if (reverbGainNode) reverbGainNode.gain.value = e.target.value / 100; 
+  };
+  
+  document.getElementById('eightD').oninput = (e) => { 
+    const val = e.target.value;
+    document.getElementById('eightDVal').innerText = val == 0 ? translations[currentLang].off : val;
+    clearInterval(pannerInterval);
+    if (val > 0 && pannerNode && isPlaying) {
+      pannerInterval = setInterval(() => {
+        pannerAngle += 0.02 * parseFloat(val);
+        pannerNode.pan.value = Math.sin(pannerAngle);
+      }, 50);
+    }
+  };
+  
+  document.getElementById('noise').oninput = (e) => { 
+    document.getElementById('noiseVal').innerText = e.target.value == 20000 ? translations[currentLang].off : `${e.target.value} Hz`; 
+    if (noiseNode) noiseNode.frequency.value = e.target.value; 
+  };
+
+  function setupNodes(ctx) {
+    bassNode = ctx.createBiquadFilter();
+    bassNode.type = 'lowshelf';
+    bassNode.frequency.value = 60;
+    bassNode.gain.value = document.getElementById('bass').value;
+
+    noiseNode = ctx.createBiquadFilter();
+    noiseNode.type = 'lowpass';
+    noiseNode.frequency.value = document.getElementById('noise').value;
+
+    pannerNode = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+
+    reverbNode = ctx.createConvolver();
+    reverbNode.buffer = createReverbBuffer(ctx);
+    reverbGainNode = ctx.createGain();
+    reverbGainNode.gain.value = document.getElementById('reverb').value / 100;
+
+    analyser = ctx.createAnalyser();
+    analyser.fftSize = 64;
+  }
+
+  function createReverbBuffer(ctx) {
+    const rate = ctx.sampleRate, length = rate * 2.5, impulse = ctx.createBuffer(2, length, rate);
+    for (let c = 0; c < 2; c++) {
+      const data = impulse.getChannelData(c);
+      for (let i = 0; i < length; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2.0);
+    }
+    return impulse;
+  }
+
+  // Playback
+  document.getElementById('playBtn').onclick = () => {
+    if (isPlaying) {
+      if (sourceNode) sourceNode.stop();
+      clearInterval(pannerInterval);
+      isPlaying = false;
+      document.getElementById('playBtn').innerText = translations[currentLang].play;
+    } else {
+      setupNodes(audioCtx);
+      sourceNode = audioCtx.createBufferSource();
+      sourceNode.buffer = audioBuffer;
+      sourceNode.playbackRate.value = document.getElementById('speed').value;
+
+      sourceNode.connect(bassNode);
+      bassNode.connect(noiseNode);
+      
+      let lastNode = noiseNode;
+      if (pannerNode) { lastNode.connect(pannerNode); lastNode = pannerNode; }
+      
+      lastNode.connect(analyser);
+      analyser.connect(audioCtx.destination);
+
+      lastNode.connect(reverbNode);
+      reverbNode.connect(reverbGainNode);
+      reverbGainNode.connect(audioCtx.destination);
+
+      // 8D Animation
+      const eSpeed = parseFloat(document.getElementById('eightD').value);
+      if (eSpeed > 0 && pannerNode) {
+        pannerInterval = setInterval(() => {
+          pannerAngle += 0.02 * eSpeed;
+          pannerNode.pan.value = Math.sin(pannerAngle);
+        }, 50);
+      }
+
+      sourceNode.start(0);
+      isPlaying = true;
+      document.getElementById('playBtn').innerText = translations[currentLang].stop;
+      drawVisualizer();
+
+      sourceNode.onended = () => {
+        isPlaying = false;
+        clearInterval(pannerInterval);
+        document.getElementById('playBtn').innerText = translations[currentLang].play;
+      };
+    }
+  };
+
+  // Visualizer Loop
+  function drawVisualizer() {
+    if (!isPlaying) return;
+    requestAnimationFrame(drawVisualizer);
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    analyser.getByteFrequencyData(dataArray);
+
+    canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+    const barWidth = (canvas.width / bufferLength) * 2.5;
+    let x = 0;
+
+    for (let i = 0; i < bufferLength; i++) {
+      const barHeight = dataArray[i] / 4;
+      canvasCtx.fillStyle = `#38bdf8`;
+      canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+      x += barWidth + 1;
+    }
+  }
+
+  // Export (WAV & MP3) - "Save As" pəncərəsi ilə
+  document.getElementById('downloadBtn').onclick = async () => {
+    const pRate = parseFloat(document.getElementById('speed').value);
+    const duration = audioBuffer.duration / pRate + 2.0;
+    const offlineCtx = new OfflineAudioContext(audioBuffer.numberOfChannels, Math.ceil(duration * audioBuffer.sampleRate), audioBuffer.sampleRate);
+
+    setupNodes(offlineCtx);
+    const offSource = offlineCtx.createBufferSource();
+    offSource.buffer = audioBuffer;
+    offSource.playbackRate.value = pRate;
+
+    offSource.connect(bassNode);
+    bassNode.connect(noiseNode);
+    noiseNode.connect(offlineCtx.destination);
+    noiseNode.connect(reverbNode);
+    reverbNode.connect(reverbGainNode);
+    reverbGainNode.connect(offlineCtx.destination);
+
+    offSource.start(0);
+    const rendered = await offlineCtx.startRendering();
+    
+    const format = document.getElementById('exportFormat').value;
+    let blob;
+
+    if (format === 'wav') {
+      blob = bufferToWave(rendered, rendered.length);
+    } else {
+      blob = bufferToMp3(rendered);
+    }
+
+    const defaultName = `emtoolz_audio.${format}`;
+
+    // Fayl adını və yerini seçmək üçün interfeys
+    if ('showSaveFilePicker' in window) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: defaultName,
+          types: [{
+            description: 'Audio File',
+            accept: {
+              [format === 'wav' ? 'audio/wav' : 'audio/mp3']: [`.${format}`]
+            }
+          }]
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error(err);
+        }
+      }
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = defaultName;
+      a.click();
+    }
+  };
+
+  function bufferToWave(abuffer, len) {
+    let numOfChan = abuffer.numberOfChannels, length = len * numOfChan * 2 + 44, buffer = new ArrayBuffer(length), view = new DataView(buffer), channels = [], i, sample, offset = 0, pos = 0;
+    function setUint16(data) { view.setUint16(pos, data, true); pos += 2; }
+    function setUint32(data) { view.setUint32(pos, data, true); pos += 4; }
+    setUint32(0x46464952); setUint32(length - 8); setUint32(0x45564157); setUint32(0x20746d66); setUint32(16); setUint16(1); setUint16(numOfChan);
+    setUint32(abuffer.sampleRate); setUint32(abuffer.sampleRate * 2 * numOfChan); setUint16(numOfChan * 2); setUint16(16); setUint32(0x61746164); setUint32(length - pos - 4);
+    for(i = 0; i < abuffer.numberOfChannels; i++) channels.push(abuffer.getChannelData(i));
+    while(pos < length) {
+      for(i = 0; i < numOfChan; i++) {
+        sample = Math.max(-1, Math.min(1, channels[i][offset]));
+        sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767)|0;
+        view.setInt16(pos, sample, true); pos += 2;
+      }
+      offset++;
+    }
+    return new Blob([buffer], {type: "audio/wav"});
+  }
+
+  function bufferToMp3(buffer) {
+    const channels = buffer.numberOfChannels;
+    const sampleRate = buffer.sampleRate;
+    const mp3encoder = new lamejs.Mp3Encoder(channels, sampleRate, 128);
+    const mp3Data = [];
+
+    const left = buffer.getChannelData(0);
+    const right = channels > 1 ? buffer.getChannelData(1) : left;
+
+    const sampleBlockSize = 1152;
+    for (let i = 0; i < left.length; i += sampleBlockSize) {
+      const leftChunk = left.subarray(i, i + sampleBlockSize);
+      const rightChunk = right.subarray(i, i + sampleBlockSize);
+
+      const l = new Int16Array(leftChunk.length);
+      const r = new Int16Array(rightChunk.length);
+
+      for (let j = 0; j < leftChunk.length; j++) {
+        l[j] = leftChunk[j] < 0 ? leftChunk[j] * 32768 : leftChunk[j] * 32767;
+        r[j] = rightChunk[j] < 0 ? rightChunk[j] * 32768 : rightChunk[j] * 32767;
+      }
+
+      const mp3buf = mp3encoder.encodeBuffer(l, r);
+      if (mp3buf.length > 0) mp3Data.push(mp3buf);
+    }
+
+    const mp3buf = mp3encoder.flush();
+    if (mp3buf.length > 0) mp3Data.push(mp3buf);
+
+    return new Blob(mp3Data, { type: 'audio/mp3' });
+  }
+</script>
+</body>
+</html>
