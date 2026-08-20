@@ -139,6 +139,7 @@
       color: white;
       font-weight: bold;
       cursor: pointer;
+      transition: background-color 0.2s;
     }
 
     #playBtn { background-color: #10b981; }
@@ -220,6 +221,7 @@
       play: "Play",
       stop: "Stop",
       download: "Export",
+      rendering: "Rendering...",
       off: "Off"
     },
     ru: {
@@ -232,6 +234,7 @@
       play: "Воспроизвести",
       stop: "Стоп",
       download: "Экспорт",
+      rendering: "Обработка...",
       off: "Выкл"
     }
   };
@@ -382,7 +385,6 @@
       reverbNode.connect(reverbGainNode);
       reverbGainNode.connect(audioCtx.destination);
 
-      // 8D Animation
       const eSpeed = parseFloat(document.getElementById('eightD').value);
       if (eSpeed > 0 && pannerNode) {
         pannerInterval = setInterval(() => {
@@ -424,8 +426,11 @@
     }
   }
 
-  // Export (WAV & MP3) - "Save As" pəncərəsi ilə
+  // Dynamic Export Progress Logic
   document.getElementById('downloadBtn').onclick = async () => {
+    const downloadBtn = document.getElementById('downloadBtn');
+    downloadBtn.disabled = true;
+    
     const pRate = parseFloat(document.getElementById('speed').value);
     const duration = audioBuffer.duration / pRate + 2.0;
     const offlineCtx = new OfflineAudioContext(audioBuffer.numberOfChannels, Math.ceil(duration * audioBuffer.sampleRate), audioBuffer.sampleRate);
@@ -443,20 +448,24 @@
     reverbGainNode.connect(offlineCtx.destination);
 
     offSource.start(0);
+    
+    downloadBtn.innerText = translations[currentLang].rendering;
     const rendered = await offlineCtx.startRendering();
     
     const format = document.getElementById('exportFormat').value;
     let blob;
 
     if (format === 'wav') {
+      downloadBtn.innerText = "100%";
       blob = bufferToWave(rendered, rendered.length);
     } else {
-      blob = bufferToMp3(rendered);
+      blob = await bufferToMp3WithProgress(rendered, (percent) => {
+        downloadBtn.innerText = `${percent}%`;
+      });
     }
 
     const defaultName = `emtoolz_audio.${format}`;
 
-    // Fayl adını və yerini seçmək üçün interfeys
     if ('showSaveFilePicker' in window) {
       try {
         const handle = await window.showSaveFilePicker({
@@ -483,6 +492,9 @@
       a.download = defaultName;
       a.click();
     }
+
+    downloadBtn.disabled = false;
+    downloadBtn.innerText = translations[currentLang].download;
   };
 
   function bufferToWave(abuffer, len) {
@@ -503,36 +515,55 @@
     return new Blob([buffer], {type: "audio/wav"});
   }
 
-  function bufferToMp3(buffer) {
-    const channels = buffer.numberOfChannels;
-    const sampleRate = buffer.sampleRate;
-    const mp3encoder = new lamejs.Mp3Encoder(channels, sampleRate, 128);
-    const mp3Data = [];
+  // Exact MP3 Encoding with Progress Callback
+  function bufferToMp3WithProgress(buffer, onProgress) {
+    return new Promise((resolve) => {
+      const channels = buffer.numberOfChannels;
+      const sampleRate = buffer.sampleRate;
+      const mp3encoder = new lamejs.Mp3Encoder(channels, sampleRate, 128);
+      const mp3Data = [];
 
-    const left = buffer.getChannelData(0);
-    const right = channels > 1 ? buffer.getChannelData(1) : left;
+      const left = buffer.getChannelData(0);
+      const right = channels > 1 ? buffer.getChannelData(1) : left;
 
-    const sampleBlockSize = 1152;
-    for (let i = 0; i < left.length; i += sampleBlockSize) {
-      const leftChunk = left.subarray(i, i + sampleBlockSize);
-      const rightChunk = right.subarray(i, i + sampleBlockSize);
+      const sampleBlockSize = 1152;
+      const totalBlocks = Math.ceil(left.length / sampleBlockSize);
+      let currentBlock = 0;
 
-      const l = new Int16Array(leftChunk.length);
-      const r = new Int16Array(rightChunk.length);
+      function processChunk() {
+        const start = currentBlock * sampleBlockSize;
+        const end = Math.min(start + sampleBlockSize, left.length);
 
-      for (let j = 0; j < leftChunk.length; j++) {
-        l[j] = leftChunk[j] < 0 ? leftChunk[j] * 32768 : leftChunk[j] * 32767;
-        r[j] = rightChunk[j] < 0 ? rightChunk[j] * 32768 : rightChunk[j] * 32767;
+        if (start < left.length) {
+          const leftChunk = left.subarray(start, end);
+          const rightChunk = right.subarray(start, end);
+
+          const l = new Int16Array(leftChunk.length);
+          const r = new Int16Array(rightChunk.length);
+
+          for (let j = 0; j < leftChunk.length; j++) {
+            l[j] = leftChunk[j] < 0 ? leftChunk[j] * 32768 : leftChunk[j] * 32767;
+            r[j] = rightChunk[j] < 0 ? rightChunk[j] * 32768 : rightChunk[j] * 32767;
+          }
+
+          const mp3buf = mp3encoder.encodeBuffer(l, r);
+          if (mp3buf.length > 0) mp3Data.push(mp3buf);
+
+          currentBlock++;
+          const percent = Math.floor((currentBlock / totalBlocks) * 100);
+          onProgress(percent);
+
+          // Yield UI thread to update button text smoothy
+          setTimeout(processChunk, 0);
+        } else {
+          const mp3buf = mp3encoder.flush();
+          if (mp3buf.length > 0) mp3Data.push(mp3buf);
+          resolve(new Blob(mp3Data, { type: 'audio/mp3' }));
+        }
       }
 
-      const mp3buf = mp3encoder.encodeBuffer(l, r);
-      if (mp3buf.length > 0) mp3Data.push(mp3buf);
-    }
-
-    const mp3buf = mp3encoder.flush();
-    if (mp3buf.length > 0) mp3Data.push(mp3buf);
-
-    return new Blob(mp3Data, { type: 'audio/mp3' });
+      processChunk();
+    });
   }
 </script>
 </body>
